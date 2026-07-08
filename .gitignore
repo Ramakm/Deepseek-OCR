@@ -1,0 +1,5 @@
+.libx_venv
+__pycache__/
+*.pyc
+*.pyo
+.vulnerabilityx_venv
