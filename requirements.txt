@@ -1,12 +1,12 @@
 # Core dependencies
-torch>=2.0.0
+torch>=2.12.1
 torchvision>=0.15.0
-transformers>=4.30.0
+transformers>=5.13.0
 timm>=0.9.0
 
 # Image processing
-pillow>=9.0.0
-opencv-python>=4.7.0
+pillow>=12.3.0
+opencv-python>=5.0.0.93
 
 # Metrics
 editdistance>=0.6.0
@@ -14,7 +14,7 @@ editdistance>=0.6.0
 # Training
 accelerate>=0.20.0
 datasets>=2.12.0
-tqdm>=4.65.0
+tqdm>=4.68.4
 
 # Configuration
 pyyaml>=6.0
@@ -25,7 +25,7 @@ pytesseract>=0.3.10  # Tesseract baseline
 paddleocr>=2.7.0    # PaddleOCR baseline
 
 # Optional: For demo
-gradio>=3.35.0      # Web UI demo
+gradio>=6.19.0      # Web UI demo
 
 # Development
 jupyter>=1.0.0
