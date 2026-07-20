@@ -1,5 +1,154 @@
 """Image I/O utilities for DeepSeek-OCR.
 
+Handles image loading, resizing, padding, and preprocessing for different
+resolution modes.
+"""
+import math
+from pathlib import Path
+from typing import Tuple, Union
+
+import numpy as np
+import torch
+from PIL import Image
+
+# ---------------------------------------------------------------------------
+# Mode configurations
+# ---------------------------------------------------------------------------
+
+MODE_CONFIGS = {
+    "tiny": {
+        "size": (224, 224),
+        "tokens": 64,
+        "pad": False,
+    },
+    "small": {
+        "size": (448, 448),
+        "tokens": 256,
+        "pad": False,
+    },
+    "base": {
+        "size": (896, 896),
+        "tokens": 1024,
+        "pad": True,
+    },
+    "large": {
+        "size": (1344, 1344),
+        "tokens": 2304,
+        "pad": True,
+    },
+}
+
+# ---------------------------------------------------------------------------
+# resize_and_pad
+# ---------------------------------------------------------------------------
+
+def resize_and_pad(
+    img: Image.Image,
+    target_size: Tuple[int, int],
+    pad_color: Tuple[int, int, int] = (0, 0, 0),
+) -> Image.Image:
+    """Resize image maintaining aspect ratio and pad to target size.
+
+    Args:
+        img: PIL image to resize.
+        target_size: (width, height) target dimensions.
+        pad_color: RGB color to use for padding.
+
+    Returns:
+        PIL image of exactly target_size.
+    """
+    img = img.convert("RGB")
+    target_w, target_h = target_size
+
+    # Compute scale to fit within target preserving aspect ratio
+    scale = min(target_w / img.width, target_h / img.height)
+    new_w = int(img.width * scale)
+    new_h = int(img.height * scale)
+
+    img = img.resize((new_w, new_h), Image.LANCZOS)
+
+    # Create padded canvas
+    canvas = Image.new("RGB", (target_w, target_h), pad_color)
+    offset_x = (target_w - new_w) // 2
+    offset_y = (target_h - new_h) // 2
+    canvas.paste(img, (offset_x, offset_y))
+
+    return canvas
+
+
+# ---------------------------------------------------------------------------
+# calculate_valid_tokens
+# ---------------------------------------------------------------------------
+
+def calculate_valid_tokens(
+    img: Image.Image,
+    target_size: Tuple[int, int],
+    max_tokens: int,
+) -> int:
+    """Calculate the number of valid (non-padding) tokens for an image.
+
+    Computes the fraction of the target canvas covered by the resized image
+    (i.e., the area ratio) and multiplies by max_tokens.
+
+    Args:
+        img: PIL image.
+        target_size: (width, height) target canvas dimensions.
+        max_tokens: total number of tokens for the full canvas.
+
+    Returns:
+        Integer number of valid tokens.
+    """
+    target_w, target_h = target_size
+    scale = min(target_w / img.width, target_h / img.height)
+    new_w = int(img.width * scale)
+    new_h = int(img.height * scale)
+
+    area_ratio = (new_w * new_h) / (target_w * target_h)
+    return int(math.floor(area_ratio * max_tokens))
+
+
+# ---------------------------------------------------------------------------
+# load_image
+# ---------------------------------------------------------------------------
+
+def load_image(
+    path: Union[str, Path],
+    mode: str = "base",
+    return_pil: bool = False,
+) -> Union[torch.Tensor, Image.Image]:
+    """Load and preprocess an image for DeepSeek-OCR.
+
+    Args:
+        path: path to image file.
+        mode: one of 'tiny', 'small', 'base', 'large'.
+        return_pil: if True, return PIL image instead of tensor.
+
+    Returns:
+        Float32 tensor of shape [1, 3, H, W] normalized to [0, 1],
+        or PIL image if return_pil=True.
+    """
+    if mode not in MODE_CONFIGS:
+        raise ValueError(f"Unknown mode '{mode}'. Choose from {list(MODE_CONFIGS.keys())}")
+
+    cfg = MODE_CONFIGS[mode]
+    target_size = cfg["size"]  # (W, H)
+
+    img = Image.open(path).convert("RGB")
+
+    if cfg["pad"]:
+        img = resize_and_pad(img, target_size)
+    else:
+        img = img.resize(target_size, Image.LANCZOS)
+
+    if return_pil:
+        return img
+
+    # Convert to tensor [1, 3, H, W] float32 in [0, 1]
+    arr = np.array(img).astype(np.float32) / 255.0
+    tensor = torch.from_numpy(arr).permute(2, 0, 1).unsqueeze(0)
+    return tensor
+"""Image I/O utilities for DeepSeek-OCR.
+
 Handles image loading, preprocessing, and mode-specific resizing/padding
 according to the paper's multi-resolution support.
 """
